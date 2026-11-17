@@ -211,10 +211,8 @@ abbr{text-decoration:none}
 
 /* Pied de page */
 .foot{margin-top:1.3rem}
-.actions{display:flex;flex-wrap:wrap;gap:.6rem}
 .btn{padding:.72rem 1.05rem;border:1.5px solid var(--green);border-radius:10px;background:var(--green);color:var(--on-green);font-weight:700;font-size:1rem;cursor:pointer;touch-action:manipulation}
 .btn.ghost{background:transparent;color:var(--green)}
-.btn.confirm{background:var(--red);border-color:var(--red);color:#fff}
 .note{margin:.9rem .15rem 0;max-width:62ch;font-size:.82rem;line-height:1.5;color:var(--muted)}
 
 /* Barre de résultat en direct */
@@ -230,6 +228,8 @@ abbr{text-decoration:none}
 .saverow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--line)}
 .saverow input[type="date"]{flex:0 1 auto;max-width:11.5rem;min-height:2.85rem;font-family:var(--num);font-size:1.05rem;font-weight:700;color:var(--ink);background:var(--field);border:1px solid var(--line-strong);border-radius:10px;padding:.45rem .6rem}
 .saverow .btn{flex:1 1 8rem}
+.cardacts{flex-basis:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.cardacts .btn{padding-left:.5rem;padding-right:.5rem}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .save-hint{flex-basis:100%;margin:0;font-size:.8rem;color:var(--muted)}
 .memo{margin-top:1rem;padding:1.05rem .9rem 1.1rem;background:var(--card);border:1px solid var(--line-strong);border-radius:16px}
@@ -347,6 +347,10 @@ abbr{text-decoration:none}
       <div class="saverow">
         <input type="date" id="round-date" aria-label="Date de la partie">
         <button type="button" class="btn" id="round-save" disabled>Enregistrer la partie</button>
+        <div class="cardacts">
+          <button type="button" class="btn ghost" id="b-new">Nouvelle partie</button>
+          <button type="button" class="btn ghost" id="b-clear">Effacer score</button>
+        </div>
         <p class="save-hint" id="save-hint">Complétez les 18 trous pour enregistrer la partie dans la mémoire.</p>
       </div>
     </div>
@@ -438,11 +442,7 @@ abbr{text-decoration:none}
   </section>
 
   <footer class="foot">
-    <div class="actions">
-      <button type="button" class="btn" id="b-new">Nouvelle partie</button>
-      <button type="button" class="btn ghost" id="b-reset">Tout effacer</button>
-    </div>
-    <p class="note">«&nbsp;Nouvelle partie&nbsp;» vide les scores et le PCC sans rien enregistrer. «&nbsp;Enregistrer la partie&nbsp;» l’ajoute d’abord à la mémoire. «&nbsp;Tout effacer&nbsp;» vide aussi la mémoire&nbsp;: exportez-la avant si besoin.</p>
+    <p class="note">«&nbsp;Nouvelle partie&nbsp;» remet à zéro le slope, le SSS, le par des trous, les scores et l’effet sur l’index (PCC compris), sans rien enregistrer. Votre index, vos 20&nbsp;différentiels et la mémoire sont conservés. «&nbsp;Effacer score&nbsp;» vide seulement les scores de la carte.</p>
     <p class="note">Méthode&nbsp;: World Handicap System tel qu’appliqué par la ffgolf, pour une carte de 18&nbsp;trous. Handicap de jeu = index × slope / 113 + (SSS − par), arrondi. Pour l’index, chaque trou est plafonné au double bogey net (score brut ajusté), puis différentiel = 113 / slope × (brut ajusté − SSS − PCC). Le nouvel index est la moyenne des 8&nbsp;meilleurs différentiels des 20&nbsp;dernières cartes, avec réduction pour score exceptionnel (−1 à partir de 7&nbsp;points sous l’index, −2 à partir de 10) et plafonnement des hausses. Résultats indicatifs&nbsp;: seul le calcul fédéral fait foi.</p>
   </footer>
 </main>
@@ -703,7 +703,7 @@ abbr{text-decoration:none}
     const pcc = String(c.pcc == null ? 0 : c.pcc);
     b.pcc = ['-1', '0', '1', '2', '3'].includes(pcc) ? pcc : '0';
     if (Array.isArray(c.trous) && c.trous.length === 18) {
-      b.holes = c.trous.map(t => ({ par: toStr(t && t.par) || '4', hcp: toStr(t && t.hcp), score: toStr(t && t.score) }));
+      b.holes = c.trous.map(t => ({ par: toStr(t && t.par), hcp: toStr(t && t.hcp), score: toStr(t && t.score) }));
     }
     b.courses = (Array.isArray(o.parcours) ? o.parcours : []).map(cleanCourse).filter(Boolean).sort((x, y) => x.nom.localeCompare(y.nom, 'fr'));
     b.rounds = sortRounds((Array.isArray(o.parties) ? o.parties : []).map(cleanRound).filter(Boolean));
@@ -744,7 +744,7 @@ abbr{text-decoration:none}
     tr.dataset.i = i;
     tr.innerHTML =
       '<th scope="row">' + n + '</th>' +
-      '<td><input class="cell-in in-par" data-f="par" inputmode="numeric" autocomplete="off" maxlength="1" aria-label="Par du trou ' + n + '"></td>' +
+      '<td><input class="cell-in in-par" data-f="par" inputmode="numeric" autocomplete="off" maxlength="1" placeholder="\u2013" aria-label="Par du trou ' + n + '"></td>' +
       '<td><input class="cell-in in-hcp" data-f="hcp" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="\u2013" aria-label="Handicap du trou ' + n + '"></td>' +
       '<td class="cr"></td>' +
       '<td><div class="stepper">' +
@@ -787,7 +787,8 @@ abbr{text-decoration:none}
     ixDiff: $('ix-diff'), ixDiffF: $('ix-diff-f'), ixMsg: $('ix-msg'), ixEsr: $('ix-esr'),
     mkP: $('mk-p'), mk: { under: $('mk-under'), e1: $('mk-e1'), e2: $('mk-e2') },
     hCount: $('h-count'), hOut: $('h-out'),
-    live: $('live'), lvPts: $('lv-pts'), lvB: $('lv-b'), lvC: $('lv-c')
+    live: $('live'), lvPts: $('lv-pts'), lvB: $('lv-b'), lvC: $('lv-c'),
+    bNew: $('b-new'), bClear: $('b-clear')
   };
 
   function crHtml(n) {
@@ -862,25 +863,31 @@ abbr{text-decoration:none}
       if (!c.okI) miss.push(st.index.trim() ? 'un index valide (54 au plus)' : 'votre index');
       if (!c.okS) miss.push(st.slope.trim() ? 'un slope entre 55 et 155' : 'le slope');
       if (!c.okR) miss.push(st.sss.trim() ? 'un SSS valide' : 'le SSS');
-      el.hjF.textContent = miss.length ? 'Renseignez ' + listFr(miss) + '.' : 'Vérifiez le par de chaque trou.';
+      el.hjF.textContent = miss.length ? 'Renseignez ' + listFr(miss) + '.' : 'Renseignez le par de chaque trou.';
     }
 
     // Alertes sur la carte
     const w = [];
     if (c.hcpMissing.length === 18 && !c.hcpBad) w.push('Renseignez le handicap de chaque trou (de 1 à 18), indiqué sur la carte du parcours.');
     else {
-      if (c.hcpMissing.length) w.push((c.hcpMissing.length > 1 ? 'Il manque les handicaps ' : 'Il manque le handicap ') + listFr(c.hcpMissing) + '.');
+      if (c.hcpMissing.length > 6) w.push('Il manque ' + c.hcpMissing.length + ' handicaps de trou.');
+      else if (c.hcpMissing.length) w.push((c.hcpMissing.length > 1 ? 'Il manque les handicaps ' : 'Il manque le handicap ') + listFr(c.hcpMissing) + '.');
       if (c.hcpDup.length) w.push((c.hcpDup.length > 1 ? 'Les handicaps ' + listFr(c.hcpDup) + ' sont saisis' : 'Le handicap ' + c.hcpDup[0] + ' est saisi') + ' plusieurs fois.');
       if (c.hcpBad) w.push('Un handicap de trou va de 1 à 18.');
     }
-    if (!c.allPar) w.push('Le par de chaque trou doit être compris entre 3 et 6.');
+    const parEmpty = [], parBad = [];
+    st.holes.forEach((h, i) => { if (h.par.trim() === '') parEmpty.push(i + 1); else if (!c.parOk[i]) parBad.push(i + 1); });
+    if (parEmpty.length === 18) w.push('Renseignez le par de chaque trou, indiqué sur la carte du parcours.');
+    else if (parEmpty.length > 6) w.push('Il manque le par de ' + parEmpty.length + ' trous.');
+    else if (parEmpty.length) w.push((parEmpty.length > 1 ? 'Il manque le par des trous ' : 'Il manque le par du trou ') + listFr(parEmpty) + '.');
+    if (parBad.length) w.push('Le par d’un trou va de 3 à 6.');
     el.warn.textContent = w.join(' ');
     el.warn.hidden = !w.length;
 
     // Lignes
     c.holes.forEach((h, i) => {
       const r = rows[i];
-      r.par.classList.toggle('bad', !c.parOk[i]);
+      r.par.classList.toggle('bad', st.holes[i].par.trim() !== '' && !c.parOk[i]);
       r.hcp.classList.toggle('bad', c.hcpState[i] === 'bad' || c.hcpState[i] === 'dup');
       const crh = crHtml(h.cr);
       if (r.cr.innerHTML !== crh) r.cr.innerHTML = crh;
@@ -915,7 +922,13 @@ abbr{text-decoration:none}
     } else {
       el.resNum.textContent = '–';
       el.resUnit.textContent = 'points en Stableford net';
-      el.resSub.textContent = c.strokesKnown ? 'Saisissez vos scores trou par trou.' : 'Complétez l’index, le slope, le SSS et les handicaps des trous.';
+      const todo = [];
+      if (!c.okI) todo.push('l’index');
+      if (!c.okS) todo.push('le slope');
+      if (!c.okR) todo.push('le SSS');
+      if (!c.allPar) todo.push('le par des trous');
+      if (!c.hcpOk) todo.push('les handicaps des trous');
+      el.resSub.textContent = todo.length ? 'Complétez ' + listFr(todo) + '.' : 'Saisissez vos scores trou par trou.';
     }
     el.sBrut.textContent = c.nSc ? c.gross : '–';
     el.sNet.textContent = c.complete ? mn(c.gross - c.hj) : '–';
@@ -982,11 +995,16 @@ abbr{text-decoration:none}
     // Enregistrement de la partie dans la mémoire
     const canSave = c.complete && c.okI;
     mem.roundSave.disabled = !canSave;
-    mem.saveHint.textContent = !canSave
+    mem.saveHint.textContent = fr(!canSave
       ? 'Complétez les 18 trous pour enregistrer la partie dans la mémoire.'
       : pr.mode === 'precise'
-        ? 'Ajoute la partie à la mémoire et son différentiel à votre historique, met l’index à jour, puis vide la carte.'
-        : 'Ajoute la partie à la mémoire, puis vide la carte. Sans historique de différentiels, l’index saisi ne change pas.';
+        ? q('Enregistrer la partie') + ' l’ajoute à la mémoire et son différentiel à votre historique, met l’index à jour, puis efface les scores.'
+        : q('Enregistrer la partie') + ' l’ajoute à la mémoire, puis efface les scores. Sans historique de différentiels, l’index saisi ne change pas.');
+
+    // Boutons « Nouvelle partie » et « Effacer score »
+    const hasScores = st.holes.some(h => h.score.trim() !== '');
+    el.bClear.disabled = !hasScores;
+    el.bNew.disabled = !hasScores && st.slope === '' && st.sss === '' && st.pcc === '0' && !st.courseId && !st.courseName.trim() && st.holes.every(h => h.par === '');
   }
 
   /* ---------- Mémoire : affichage et actions ---------- */
@@ -1323,29 +1341,25 @@ abbr{text-decoration:none}
     toast('Historique de différentiels effacé.', snap);
   });
 
-  $('b-new').addEventListener('click', () => {
-    st.holes.forEach(h => { h.score = ''; });
-    st.pcc = '0';
-    fillInputs(); update(); save();
-    document.querySelector('.grid').scrollIntoView({ behavior: smooth(), block: 'start' });
-  });
-  const bReset = $('b-reset');
-  let armed = null;
-  function disarm() { clearTimeout(armed); armed = null; bReset.textContent = 'Tout effacer'; bReset.classList.remove('confirm'); }
-  bReset.addEventListener('click', () => {
-    if (!armed) {
-      bReset.textContent = 'Confirmer\u00a0: tout effacer';
-      bReset.classList.add('confirm');
-      armed = setTimeout(disarm, 4000);
-      return;
-    }
-    disarm();
+  el.bNew.addEventListener('click', () => {
     const snap = snapshot();
-    st = blank();
+    st.slope = '';
+    st.sss = '';
+    st.holes.forEach(h => { h.par = ''; h.score = ''; });
+    st.pcc = '0';                       // effet sur l’index : repart de zéro
+    st.courseName = '';
+    st.courseId = '';
     mem.roundDate.value = todayIso();
     refreshAll();
-    window.scrollTo({ top: 0, behavior: smooth() });
-    toast('Tout est effacé, mémoire comprise.', snap);
+    document.querySelector('.card').scrollIntoView({ behavior: smooth(), block: 'start' });
+    toast('Nouvelle partie : slope, SSS, par, scores et effet sur l’index remis à zéro.', snap);
+  });
+  el.bClear.addEventListener('click', () => {
+    const snap = snapshot();
+    st.holes.forEach(h => { h.score = ''; });
+    refreshAll();
+    document.querySelector('.grid').scrollIntoView({ behavior: smooth(), block: 'start' });
+    toast('Scores effacés.', snap);
   });
 
   el.live.addEventListener('click', () => $('result').scrollIntoView({ behavior: smooth(), block: 'start' }));
