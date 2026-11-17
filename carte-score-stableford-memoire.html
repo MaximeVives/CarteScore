@@ -1,0 +1,1374 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carte de score – Stableford, index et mémoire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400;500;600;700&family=Sofia+Sans+Condensed:wght@500;600;700;800&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#E6EDE8;
+  --card:#FFFFFF;
+  --ink:#16291F;
+  --muted:#56695C;
+  --line:#D7E2DA;
+  --line-strong:#AEC3B4;
+  --tint:#EEF4F0;
+  --field:#F4F8F5;
+  --green:#1D6A45;
+  --on-green:#FFFFFF;
+  --red:#BE342A;
+  --flag:#E7B524;
+  --on-flag:#2A2306;
+  --board:#1B5A3B;
+  --board-ink:#FFFFFF;
+  --board-muted:rgba(255,255,255,.78);
+  --board-line:rgba(255,255,255,.2);
+  --tile:#FFFFFF;
+  --tile-ink:#16291F;
+  --tile-down:#1D6A45;
+  --tile-up:#BE342A;
+  --focus:#1D6A45;
+  --num:"Sofia Sans Condensed","Avenir Next Condensed","Arial Narrow","Roboto Condensed",sans-serif-condensed,system-ui,sans-serif;
+  --text:"Sofia Sans",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0C1711;--card:#13221A;--ink:#E2ECE5;--muted:#9AAFA1;--line:#22362A;--line-strong:#36523F;
+    --tint:#182B20;--field:#0F1E16;--green:#6BC394;--on-green:#0C1711;--red:#FF7B6C;--flag:#F0C64B;--on-flag:#2A2306;
+    --board:#173F2A;--board-ink:#E9F2EC;--board-muted:rgba(233,242,236,.76);--board-line:rgba(233,242,236,.17);
+    --tile:#E7F0EA;--tile-ink:#0F1D15;--tile-down:#1D6A45;--tile-up:#B5332A;--focus:#6BC394;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0C1711;--card:#13221A;--ink:#E2ECE5;--muted:#9AAFA1;--line:#22362A;--line-strong:#36523F;
+  --tint:#182B20;--field:#0F1E16;--green:#6BC394;--on-green:#0C1711;--red:#FF7B6C;--flag:#F0C64B;--on-flag:#2A2306;
+  --board:#173F2A;--board-ink:#E9F2EC;--board-muted:rgba(233,242,236,.76);--board-line:rgba(233,242,236,.17);
+  --tile:#E7F0EA;--tile-ink:#0F1D15;--tile-down:#1D6A45;--tile-up:#B5332A;--focus:#6BC394;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%;text-size-adjust:100%}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--text);font-size:1rem;line-height:1.45;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,input,select{font:inherit;color:inherit}
+input{margin:0}
+input:not([type="date"]):not([type="file"]){-webkit-appearance:none;appearance:none}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+abbr{text-decoration:none}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+.wrap{max-width:36rem;margin:0 auto;padding:1.1rem .75rem 7.5rem}
+
+/* En-tête */
+.top{display:flex;align-items:center;gap:.7rem;margin:0 .2rem 1rem}
+.mark{flex:none;width:2.1rem;height:2.7rem}
+.m-hole{fill:var(--green);opacity:.3}
+.m-pole{fill:var(--ink)}
+.m-flag{fill:var(--flag)}
+.top h1{margin:0;font-family:var(--num);font-weight:800;font-size:2rem;line-height:1}
+.top p{margin:.25rem 0 0;color:var(--muted);font-size:.95rem}
+
+/* Carte */
+.card{background:var(--card);border:1px solid var(--line-strong);border-radius:16px;overflow:hidden}
+.head{padding:.95rem .85rem .9rem;border-bottom:1px solid var(--line-strong)}
+.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
+.field{display:flex;flex-direction:column;gap:.28rem}
+.field>span{font-size:.85rem;font-weight:600;color:var(--muted)}
+.field input{width:100%;min-width:0;font-family:var(--num);font-size:1.4rem;font-weight:700;font-variant-numeric:tabular-nums lining-nums;color:var(--ink);background:var(--field);border:1px solid var(--line-strong);border-radius:8px;padding:.42rem .6rem}
+.field input::placeholder{color:var(--muted);opacity:.6;font-weight:500;font-size:1.05rem}
+.field input.bad{border-color:var(--red);color:var(--red)}
+
+.hj{display:flex;align-items:center;gap:.8rem;margin-top:.9rem}
+.hj-num{flex:none;min-width:3.4rem;padding:.3rem .45rem;border:2px solid var(--green);border-radius:10px;text-align:center;font-family:var(--num);font-weight:800;font-size:2.5rem;line-height:1;color:var(--green);font-variant-numeric:tabular-nums}
+.hj-txt{min-width:0}
+.hj-txt strong{display:block;font-size:1.02rem;font-weight:700}
+.hj-txt span{display:block;font-size:.85rem;color:var(--muted);line-height:1.35}
+.warn{margin:.8rem 0 0;padding:.5rem .65rem;border-left:3px solid var(--red);background:var(--tint);font-size:.88rem}
+
+/* Grille trou par trou */
+.grid-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.grid{width:100%;min-width:19.75rem;border-collapse:collapse;table-layout:fixed;font-variant-numeric:tabular-nums lining-nums}
+.grid col.c-hole{width:2.55rem}
+.grid col.c-par{width:2.35rem}
+.grid col.c-hcp{width:2.55rem}
+.grid col.c-cr{width:1.9rem}
+.grid col.c-pts{width:2.8rem}
+.grid th,.grid td{padding:0;height:2.85rem;text-align:center;vertical-align:middle;border-bottom:1px solid var(--line);border-left:1px solid var(--line)}
+.grid tr>:first-child{border-left:0}
+.grid thead th{height:2.1rem;font-size:.78rem;font-weight:600;color:var(--muted);background:var(--tint);border-bottom-color:var(--line-strong)}
+.grid tbody th{font-family:var(--num);font-weight:700;font-size:1.1rem}
+.cell-in{display:block;width:100%;height:2.85rem;border:0;border-radius:0;background:transparent;text-align:center;font-family:var(--num);font-size:1.15rem;font-weight:600;color:var(--ink);padding:0;caret-color:var(--green)}
+.in-hcp{color:var(--muted);font-weight:500}
+.cell-in::placeholder{color:var(--muted);opacity:.45}
+.cell-in:focus{outline:2px solid var(--focus);outline-offset:-2px;background:var(--field)}
+.cell-in.bad{color:var(--red);background:color-mix(in srgb,var(--red) 10%,transparent)}
+.cr{font-family:var(--num);font-weight:700;color:var(--green);font-size:1.05rem;letter-spacing:-.03em}
+.cr .give{color:var(--red);font-size:.9rem;letter-spacing:0}
+
+.stepper{display:flex;align-items:center;justify-content:center;gap:.2rem;padding:0 .2rem}
+.stepper button{flex:none;width:2.15rem;height:2.25rem;padding:0;border:0;border-radius:8px;background:var(--tint);color:var(--green);font-family:var(--num);font-size:1.4rem;font-weight:700;line-height:1;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.stepper button:active{background:var(--line)}
+.in-score{width:2.45rem;height:2.25rem;padding:0;border:1px solid var(--line-strong);border-radius:8px;background:var(--card);text-align:center;font-family:var(--num);font-size:1.3rem;font-weight:700;color:var(--ink)}
+.in-score::placeholder{color:var(--muted);opacity:.5}
+.in-score:focus{outline:2px solid var(--focus);outline-offset:0;border-color:transparent}
+
+/* Points : rond = birdie net, double rond = eagle net, carré = bogey net, double carré = 0 point */
+.pts{display:inline-grid;place-items:center;width:1.9rem;height:1.9rem;border:1.5px solid transparent;border-radius:4px;font-family:var(--num);font-size:1.1rem;font-weight:700;line-height:1;color:var(--ink);font-style:normal}
+.pts[data-k="0"]{width:1.6rem;height:1.6rem;color:var(--muted);border-color:var(--muted);box-shadow:0 0 0 2px var(--card),0 0 0 3.5px var(--muted)}
+.pts[data-k="1"]{border-color:var(--ink)}
+.pts[data-k="3"]{color:var(--red);border-color:var(--red);border-radius:50%}
+.pts[data-k="4"]{width:1.6rem;height:1.6rem;color:var(--red);border-color:var(--red);border-radius:50%;box-shadow:0 0 0 2px var(--card),0 0 0 3.5px var(--red)}
+.pts.pop{animation:pop .24s ease-out}
+@keyframes pop{from{transform:scale(.55);opacity:.3}to{transform:none;opacity:1}}
+
+.grid tr.sub th,.grid tr.sub td{height:2.4rem;background:var(--tint);font-family:var(--num);font-weight:700;font-size:1.1rem}
+.grid tr.sub th{font-size:.78rem;white-space:nowrap;overflow:hidden;letter-spacing:-.01em}
+.grid tr.sub .s-cr{color:var(--green)}
+.grid tr.total th,.grid tr.total td{height:2.8rem;border-bottom:0}
+.grid tr.total .s-pts{font-size:1.45rem;color:var(--green)}
+
+.legend{display:flex;flex-wrap:wrap;gap:.55rem 1rem;padding:.85rem .85rem .35rem;border-top:1px solid var(--line-strong);font-size:.8rem;color:var(--muted)}
+.legend>span{display:inline-flex;align-items:center;gap:.4rem}
+.legend .pts{width:1.4rem;height:1.4rem;font-size:.8rem}
+.legend .pts[data-k="0"],.legend .pts[data-k="4"]{width:1.2rem;height:1.2rem}
+.legend .slash{width:1.4rem;text-align:center;font-family:var(--num);font-weight:700;font-size:1rem;color:var(--green)}
+.hint{margin:0;padding:.25rem .85rem .95rem;font-size:.8rem;color:var(--muted)}
+
+/* Résultat */
+.result{padding:1rem .85rem 1.1rem;border-top:1px solid var(--line-strong);scroll-margin-top:1rem}
+.res-main{display:flex;align-items:flex-end;gap:.7rem}
+.res-num{font-family:var(--num);font-weight:800;font-size:4.4rem;line-height:.82;color:var(--green);font-variant-numeric:tabular-nums}
+.res-lab{padding-bottom:.1rem;min-width:0}
+.res-lab strong{display:block;font-size:1.1rem}
+.res-lab span{display:block;font-size:.9rem;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem;margin:1.1rem 0 0}
+.stats>div{display:flex;flex-direction:column;border-top:2px solid var(--line);padding-top:.4rem}
+.stats dt{font-size:.78rem;color:var(--muted);line-height:1.2}
+.stats dd{margin:auto 0 0;padding-top:.15rem;font-family:var(--num);font-weight:700;font-size:1.4rem;font-variant-numeric:tabular-nums}
+
+/* Tableau de l’index */
+.board{--focus:var(--flag);margin-top:1rem;padding:1.1rem .9rem 1.05rem;border-radius:16px;background:var(--board);color:var(--board-ink)}
+.board h2{margin:0 0 .85rem;font-family:var(--num);font-weight:800;font-size:1.5rem;line-height:1.1}
+.tiles{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:.5rem;align-items:stretch}
+.tile{background:var(--tile);color:var(--tile-ink);border-radius:10px;padding:.55rem .7rem .6rem}
+.tile .k{display:block;font-size:.78rem;font-weight:600;opacity:.72}
+.tile .v{display:block;font-family:var(--num);font-weight:800;font-size:2.4rem;line-height:1.05;font-variant-numeric:tabular-nums}
+.tile .d{display:block;min-height:1.2em;font-family:var(--num);font-weight:700;font-size:1rem}
+.tile .d.down{color:var(--tile-down)}
+.tile .d.up{color:var(--tile-up)}
+.arrow{align-self:center;font-size:1.5rem;color:var(--board-muted)}
+.diffline{display:flex;flex-wrap:wrap;align-items:baseline;gap:.15rem .55rem;margin:.95rem 0 0}
+.diffline b{font-family:var(--num);font-weight:800;font-size:1.6rem}
+.diffline small{flex-basis:100%;font-size:.82rem;color:var(--board-muted)}
+.msg{margin:.6rem 0 0;font-size:.95rem;line-height:1.5}
+.esr{margin:.8rem 0 0;padding:.6rem .75rem;border-radius:10px;background:var(--flag);color:var(--on-flag);font-weight:600;font-size:.92rem}
+.marks{margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--board-line)}
+.marks h3{margin:0;font-size:1.02rem}
+.marks p{margin:.15rem 0 .4rem;font-size:.85rem;color:var(--board-muted)}
+.marks ul{list-style:none;margin:0;padding:0}
+.marks li{display:flex;justify-content:space-between;align-items:baseline;gap:.75rem;padding:.42rem 0;border-bottom:1px solid var(--board-line);font-size:.95rem}
+.marks li b{font-family:var(--num);font-weight:800;font-size:1.2rem;white-space:nowrap}
+.marks li.hit b{color:var(--flag)}
+.marks li.hit b::after{content:" ✓"}
+.pcc{display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-top:.9rem;font-size:.95rem;font-weight:600}
+.pcc select{min-width:4.4rem;font-family:var(--num);font-weight:700;font-size:1.05rem;background:var(--tile);color:var(--tile-ink);border:0;border-radius:8px;padding:.35rem .55rem}
+.pcc-hint{margin:.3rem 0 0;font-size:.8rem;color:var(--board-muted)}
+
+.hist{margin-top:1rem;padding-top:.85rem;border-top:1px solid var(--board-line)}
+.hist summary{display:flex;justify-content:space-between;align-items:center;gap:.75rem;cursor:pointer;list-style:none;font-weight:700;font-size:1rem}
+.hist summary::-webkit-details-marker{display:none}
+.hist summary::after{content:"+";flex:none;display:grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:50%;background:var(--tile);color:var(--tile-ink);font-family:var(--num);font-size:1.3rem;line-height:1}
+.hist[open] summary::after{content:"−"}
+.hist summary small{display:block;font-weight:500;font-size:.82rem;color:var(--board-muted)}
+.h-intro{margin:.6rem 0 0;font-size:.88rem;color:var(--board-muted)}
+.hgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.4rem;margin:.75rem 0 .9rem}
+.hgrid label{position:relative;display:block}
+.hgrid label span{position:absolute;top:.22rem;left:.4rem;font-size:.62rem;font-weight:600;color:var(--tile-ink);opacity:.55;pointer-events:none}
+.hgrid input{width:100%;min-width:0;padding:.9rem .15rem .35rem;border:0;border-radius:8px;background:var(--tile);color:var(--tile-ink);text-align:center;font-family:var(--num);font-weight:700;font-size:1.05rem;font-variant-numeric:tabular-nums}
+.hgrid input.bad{box-shadow:inset 0 0 0 2px var(--tile-up)}
+.low{display:flex;flex-direction:column;gap:.3rem;font-size:.9rem;font-weight:600}
+.low em{font-style:normal;font-weight:500;color:var(--board-muted)}
+.low input{width:8rem;font-family:var(--num);font-size:1.25rem;font-weight:700;background:var(--tile);color:var(--tile-ink);border:0;border-radius:8px;padding:.4rem .6rem}
+.low-hint{margin:.3rem 0 0;font-size:.8rem;color:var(--board-muted)}
+.h-out{margin-top:.6rem;font-size:.92rem}
+.h-out p{margin:.55rem 0 0}
+.h-out b{font-family:var(--num);font-size:1.2rem}
+.chips{display:flex;flex-wrap:wrap;gap:.32rem;margin:.65rem 0 0}
+.chip{padding:.18rem .45rem;border:1px solid var(--board-line);border-radius:6px;font-family:var(--num);font-weight:700;font-size:.98rem;color:var(--board-muted);font-variant-numeric:tabular-nums}
+.chip.used{background:var(--tile);border-color:var(--tile);color:var(--tile-ink)}
+.chip.new{box-shadow:0 0 0 2px var(--flag)}
+.chip.out{text-decoration:line-through;opacity:.6}
+.h-out .chips-key{font-size:.8rem;color:var(--board-muted)}
+.linkbtn{margin-top:.8rem;padding:.35rem 0;border:0;background:none;color:var(--board-ink);text-decoration:underline;text-underline-offset:3px;font-size:.88rem;cursor:pointer}
+
+/* Pied de page */
+.foot{margin-top:1.3rem}
+.actions{display:flex;flex-wrap:wrap;gap:.6rem}
+.btn{padding:.72rem 1.05rem;border:1.5px solid var(--green);border-radius:10px;background:var(--green);color:var(--on-green);font-weight:700;font-size:1rem;cursor:pointer;touch-action:manipulation}
+.btn.ghost{background:transparent;color:var(--green)}
+.btn.confirm{background:var(--red);border-color:var(--red);color:#fff}
+.note{margin:.9rem .15rem 0;max-width:62ch;font-size:.82rem;line-height:1.5;color:var(--muted)}
+
+/* Barre de résultat en direct */
+.live{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:center;align-items:baseline;gap:1.4rem;width:100%;margin:0;border:0;border-radius:14px 14px 0 0;padding:.7rem 1rem calc(.7rem + env(safe-area-inset-bottom,0px));background:var(--board);color:var(--board-ink);font-size:.92rem;cursor:pointer;box-shadow:0 -1px 0 var(--board-line)}
+.live[hidden],body.typing .live{display:none}
+.live b{font-family:var(--num);font-weight:800;font-size:1.4rem}
+
+/* Mémoire JSON */
+.pick{display:flex;flex-direction:column;gap:.28rem;margin-bottom:.75rem}
+.pick[hidden]{display:none}
+.pick>span{font-size:.85rem;font-weight:600;color:var(--muted)}
+.pick select{width:100%;font-size:1rem;font-weight:600;color:var(--ink);background:var(--field);border:1px solid var(--line-strong);border-radius:8px;padding:.55rem .6rem}
+.saverow{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--line)}
+.saverow input[type="date"]{flex:0 1 auto;max-width:11.5rem;min-height:2.85rem;font-family:var(--num);font-size:1.05rem;font-weight:700;color:var(--ink);background:var(--field);border:1px solid var(--line-strong);border-radius:10px;padding:.45rem .6rem}
+.saverow .btn{flex:1 1 8rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.save-hint{flex-basis:100%;margin:0;font-size:.8rem;color:var(--muted)}
+.memo{margin-top:1rem;padding:1.05rem .9rem 1.1rem;background:var(--card);border:1px solid var(--line-strong);border-radius:16px}
+.memo h2{margin:0;font-family:var(--num);font-weight:800;font-size:1.5rem;line-height:1.1}
+.memo .lead{margin:.3rem 0 0;font-size:.88rem;color:var(--muted)}
+.memo h3{margin:1.2rem 0 .45rem;font-size:1.02rem}
+.spark svg{display:block;width:100%;height:auto;overflow:visible}
+.sp-line{fill:none;stroke:var(--green);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.sp-pt{fill:var(--card);stroke:var(--green);stroke-width:1.8}
+.sp-last{fill:var(--green);stroke:var(--card);stroke-width:1.5}
+.spark-cap{margin:.35rem 0 0;font-size:.85rem;color:var(--muted)}
+.mlist{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.mlist:empty{display:none}
+.mlist li{display:flex;align-items:center;gap:.55rem;padding:.6rem 0;border-bottom:1px solid var(--line)}
+.mlist .info{flex:1;min-width:0}
+.mlist .name{display:block;font-weight:700;overflow-wrap:anywhere}
+.mlist .where{font-weight:500;color:var(--muted)}
+.mlist .meta{display:flex;flex-wrap:wrap;gap:.1rem .8rem;margin-top:.1rem;font-size:.84rem;color:var(--muted)}
+.mlist .meta b{font-family:var(--num);font-weight:700;font-size:1rem;color:var(--ink)}
+.empty,.mhint{margin:.5rem 0 0;font-size:.85rem;color:var(--muted)}
+.mini{flex:none;padding:.5rem .75rem;border:1.5px solid var(--green);border-radius:8px;background:transparent;color:var(--green);font-weight:700;font-size:.92rem;cursor:pointer;touch-action:manipulation}
+.mini.solid{background:var(--green);color:var(--on-green)}
+.del{flex:none;width:2.4rem;height:2.4rem;border:0;border-radius:8px;background:var(--tint);color:var(--muted);font-size:1.25rem;line-height:1;cursor:pointer;touch-action:manipulation}
+.cform{display:flex;gap:.5rem;margin-top:.75rem}
+.cform input{flex:1;min-width:0;font-size:1rem;font-weight:600;color:var(--ink);background:var(--field);border:1px solid var(--line-strong);border-radius:8px;padding:.6rem .65rem}
+.filebtns{display:flex;flex-wrap:wrap;gap:.5rem}
+.jsonbox{margin-top:.9rem}
+.jsonbox summary{cursor:pointer;font-weight:600;color:var(--green)}
+.jsonbox textarea{display:block;width:100%;min-height:11rem;margin:.6rem 0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:1rem;line-height:1.4;color:var(--ink);background:var(--field);border:1px solid var(--line-strong);border-radius:8px;padding:.6rem;resize:vertical}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + .6rem);z-index:40;transform:translateX(-50%);display:flex;align-items:center;gap:.9rem;width:min(34rem,calc(100% - 1.5rem));padding:.75rem .9rem;border-radius:12px;background:var(--ink);color:var(--card);font-size:.92rem;line-height:1.4;box-shadow:0 8px 28px rgba(0,0,0,.2)}
+.toast[hidden]{display:none}
+.toast span{flex:1}
+.toast button{flex:none;padding:.35rem .25rem;border:0;background:none;color:inherit;font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
+@media (max-width:350px){
+  .wrap{padding-left:.5rem;padding-right:.5rem}
+  .grid{min-width:17.2rem}
+  .grid col.c-hole{width:2.3rem}
+  .grid col.c-par{width:2.05rem}
+  .grid col.c-hcp{width:2.25rem}
+  .grid col.c-cr{width:1.6rem}
+  .grid col.c-pts{width:2.5rem}
+  .stepper{gap:.15rem;padding:0 .1rem}
+  .stepper button{width:1.85rem}
+  .in-score{width:2.2rem}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){.pts.pop{animation:none}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top">
+    <svg class="mark" viewBox="0 0 36 46" aria-hidden="true">
+      <ellipse class="m-hole" cx="11" cy="41.5" rx="9" ry="2.8"/>
+      <rect class="m-pole" x="10" y="3" width="2.2" height="38.5" rx="1.1"/>
+      <path class="m-flag" d="M12.2 4.2 L33 10.8 L12.2 17.4 Z"/>
+    </svg>
+    <div>
+      <h1>Carte de score</h1>
+      <p>Stableford net, évolution de l’index et mémoire JSON</p>
+    </div>
+  </header>
+
+  <section class="card" aria-label="Saisie de la partie">
+    <div class="head">
+      <label class="pick" id="pick-wrap" hidden><span>Parcours</span><select id="course-pick"></select></label>
+      <div class="fields">
+        <label class="field"><span>Index</span><input id="f-index" inputmode="decimal" autocomplete="off" enterkeyhint="next" placeholder="ex. 16,2"></label>
+        <label class="field"><span>Slope</span><input id="f-slope" inputmode="numeric" autocomplete="off" enterkeyhint="next" placeholder="ex. 128"></label>
+        <label class="field"><span>SSS</span><input id="f-sss" inputmode="decimal" autocomplete="off" enterkeyhint="done" placeholder="ex. 71,4"></label>
+      </div>
+      <div class="hj">
+        <div class="hj-num" id="hj-num">–</div>
+        <div class="hj-txt">
+          <strong id="hj-main">Handicap de jeu</strong>
+          <span id="hj-f">Renseignez votre index, le slope et le SSS.</span>
+        </div>
+      </div>
+      <p class="warn" id="warn" hidden></p>
+    </div>
+
+    <div class="grid-wrap">
+      <table class="grid">
+        <colgroup><col class="c-hole"><col class="c-par"><col class="c-hcp"><col class="c-cr"><col><col class="c-pts"></colgroup>
+        <thead>
+          <tr><th scope="col">Trou</th><th scope="col">Par</th><th scope="col"><abbr title="Handicap du trou">Hcp</abbr></th><th scope="col"><abbr title="Coups reçus">Cr</abbr></th><th scope="col">Score</th><th scope="col">Pts</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="legend">
+      <span><span class="pts" data-k="4">4</span>eagle net ou mieux</span>
+      <span><span class="pts" data-k="3">3</span>birdie net</span>
+      <span><span class="pts" data-k="2">2</span>par net</span>
+      <span><span class="pts" data-k="1">1</span>bogey net</span>
+      <span><span class="pts" data-k="0">0</span>double bogey net ou pire</span>
+      <span><span class="slash">/</span>coup reçu</span>
+    </div>
+    <p class="hint">Balle relevée&nbsp;: notez un score au moins égal au double bogey net. Il vaut 0 point et sera plafonné pour l’index.</p>
+
+    <div class="result" id="result">
+      <h2 class="sr">Résultat</h2>
+      <div class="res-main">
+        <div class="res-num" id="res-num">–</div>
+        <div class="res-lab"><strong id="res-unit">points en Stableford net</strong><span id="res-sub">Saisissez vos scores trou par trou.</span></div>
+      </div>
+      <dl class="stats">
+        <div><dt>Score brut</dt><dd id="s-brut">–</dd></div>
+        <div><dt>Score net</dt><dd id="s-net">–</dd></div>
+        <div><dt>Stableford brut</dt><dd id="s-sbrut">–</dd></div>
+        <div><dt>Brut ajusté</dt><dd id="s-ags">–</dd></div>
+      </dl>
+      <div class="saverow">
+        <input type="date" id="round-date" aria-label="Date de la partie">
+        <button type="button" class="btn" id="round-save" disabled>Enregistrer la partie</button>
+        <p class="save-hint" id="save-hint">Complétez les 18 trous pour enregistrer la partie dans la mémoire.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="board" aria-labelledby="t-index">
+    <h2 id="t-index">Effet sur votre index</h2>
+    <div class="tiles">
+      <div class="tile"><span class="k">Index actuel</span><span class="v" id="ix-cur">–</span><span class="d"></span></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="tile"><span class="k" id="ix-new-k">Nouvel index</span><span class="v" id="ix-new">–</span><span class="d" id="ix-delta"></span></div>
+    </div>
+    <p class="diffline"><span>Différentiel de la partie</span><b id="ix-diff">–</b><small id="ix-diff-f"></small></p>
+    <p class="msg" id="ix-msg">Complétez la carte pour calculer le différentiel et l’effet sur votre index.</p>
+    <p class="esr" id="ix-esr" hidden></p>
+
+    <div class="marks">
+      <h3>Repères pour cette carte</h3>
+      <p id="mk-p">Renseignez l’index, le slope et le SSS pour voir les repères.</p>
+      <ul>
+        <li id="mk-under"><span>Jouer sous votre index</span><b>–</b></li>
+        <li id="mk-e1"><span>Score exceptionnel, −1 sur l’index</span><b>–</b></li>
+        <li id="mk-e2"><span>Score exceptionnel, −2 sur l’index</span><b>–</b></li>
+      </ul>
+    </div>
+
+    <div class="pcc">
+      <label for="f-pcc">Conditions du jour (PCC)</label>
+      <select id="f-pcc">
+        <option value="-1">−1</option>
+        <option value="0">0</option>
+        <option value="1">+1</option>
+        <option value="2">+2</option>
+        <option value="3">+3</option>
+      </select>
+    </div>
+    <p class="pcc-hint">Ajustement publié le lendemain de la compétition. Laissez 0 si vous ne le connaissez pas.</p>
+
+    <details class="hist" id="hist">
+      <summary><span>Calcul exact avec mes 20 derniers différentiels<small id="h-count">Facultatif</small></span></summary>
+      <p class="h-intro">Recopiez-les depuis votre historique ffgolf, du plus récent (1) au plus ancien (20). Vous pouvez aussi coller une liste dans une case&nbsp;: elle se répartit dans les suivantes.</p>
+      <div class="hgrid" id="hgrid"></div>
+      <label class="low"><span>Index le plus bas sur 12 mois <em>(facultatif)</em></span><input id="f-low" inputmode="decimal" autocomplete="off" placeholder="ex. 15,4"></label>
+      <p class="low-hint">Sert au plafonnement des hausses&nbsp;: au-delà de +3, la hausse est divisée par deux, et l’index ne dépasse jamais ce minimum +5.</p>
+      <div class="h-out" id="h-out" aria-live="polite"></div>
+      <button type="button" class="linkbtn" id="h-clear">Effacer l’historique</button>
+    </details>
+  </section>
+
+  <section class="memo" aria-labelledby="t-memo">
+    <h2 id="t-memo">Mémoire</h2>
+    <p class="lead">Index, historique, parcours et parties sont gardés au format JSON dans ce navigateur. Exportez le fichier pour en garder une copie ou le reprendre sur un autre appareil.</p>
+
+    <div id="spark-wrap" hidden>
+      <h3>Évolution de l’index</h3>
+      <div class="spark" id="spark"></div>
+      <p class="spark-cap" id="spark-cap"></p>
+    </div>
+
+    <h3>Mes parties</h3>
+    <ul class="mlist" id="rounds-list"></ul>
+    <p class="empty" id="rounds-empty">Aucune partie enregistrée. Quand la carte est complète, touchez «&nbsp;Enregistrer la partie&nbsp;» sous le résultat.</p>
+    <p class="mhint" id="rounds-hint" hidden>Supprimer une partie ne modifie ni l’index ni l’historique de différentiels.</p>
+
+    <h3>Mes parcours</h3>
+    <ul class="mlist" id="courses-list"></ul>
+    <p class="empty" id="courses-empty">Aucun parcours enregistré.</p>
+    <div class="cform">
+      <input id="course-name" maxlength="80" autocomplete="off" placeholder="Nom du parcours et repères" aria-label="Nom du parcours">
+      <button type="button" class="mini solid" id="course-save">Enregistrer</button>
+    </div>
+    <p class="mhint">Garde le slope, le SSS, le par et le handicap des 18&nbsp;trous de la carte actuelle. Un nom déjà utilisé met ce parcours à jour.</p>
+
+    <h3>Fichier JSON</h3>
+    <div class="filebtns">
+      <button type="button" class="btn" id="json-export">Exporter le fichier JSON</button>
+      <button type="button" class="btn ghost" id="json-import">Importer un fichier JSON</button>
+      <input type="file" id="json-file" accept=".json,application/json" hidden>
+    </div>
+    <p class="mhint">L’import remplace la mémoire actuelle&nbsp;; un bouton permet d’annuler juste après.</p>
+    <details class="jsonbox" id="json-box">
+      <summary>Copier ou coller le JSON</summary>
+      <textarea id="json-text" spellcheck="false" autocomplete="off" aria-label="Mémoire au format JSON"></textarea>
+      <div class="filebtns">
+        <button type="button" class="mini" id="json-copy">Copier</button>
+        <button type="button" class="mini" id="json-load">Charger ce JSON</button>
+      </div>
+    </details>
+  </section>
+
+  <footer class="foot">
+    <div class="actions">
+      <button type="button" class="btn" id="b-new">Nouvelle partie</button>
+      <button type="button" class="btn ghost" id="b-reset">Tout effacer</button>
+    </div>
+    <p class="note">«&nbsp;Nouvelle partie&nbsp;» vide les scores et le PCC sans rien enregistrer. «&nbsp;Enregistrer la partie&nbsp;» l’ajoute d’abord à la mémoire. «&nbsp;Tout effacer&nbsp;» vide aussi la mémoire&nbsp;: exportez-la avant si besoin.</p>
+    <p class="note">Méthode&nbsp;: World Handicap System tel qu’appliqué par la ffgolf, pour une carte de 18&nbsp;trous. Handicap de jeu = index × slope / 113 + (SSS − par), arrondi. Pour l’index, chaque trou est plafonné au double bogey net (score brut ajusté), puis différentiel = 113 / slope × (brut ajusté − SSS − PCC). Le nouvel index est la moyenne des 8&nbsp;meilleurs différentiels des 20&nbsp;dernières cartes, avec réduction pour score exceptionnel (−1 à partir de 7&nbsp;points sous l’index, −2 à partir de 10) et plafonnement des hausses. Résultats indicatifs&nbsp;: seul le calcul fédéral fait foi.</p>
+  </footer>
+</main>
+
+<button type="button" class="live" id="live" hidden>
+  <span class="sr">Voir le résultat&nbsp;:</span>
+  <span><b id="lv-pts">0</b>&nbsp;pts</span>
+  <span id="lv-b"></span>
+  <span id="lv-c"></span>
+</button>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toast-msg"></span><button type="button" id="toast-undo" hidden>Annuler</button></div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* LOGIC-START */
+  // Nombre de différentiels retenus et ajustement selon la taille de l’historique (barème WHS / ffgolf)
+  const TABLE = [null, [1, -2], [1, -2], [1, -2], [1, -1], [1, 0], [2, -1], [2, 0], [2, 0], [3, 0], [3, 0], [3, 0], [4, 0], [4, 0], [4, 0], [5, 0], [5, 0], [6, 0], [6, 0], [7, 0], [8, 0]];
+  const clean = x => Math.round(x * 1e6) / 1e6;
+  const r1 = x => Math.round(clean(x * 10)) / 10;
+  const rint = x => Math.round(clean(x));
+
+  function num(v) {
+    if (v == null) return NaN;
+    const s = String(v).replace(/[\s\u00a0\u202f]/g, '').replace(',', '.').replace('\u2212', '-');
+    if (!/^-?(\d+\.?\d*|\.\d+)$/.test(s)) return NaN;
+    return parseFloat(s);
+  }
+  // Index ou différentiel : « +2,1 » (handicap « plus ») vaut −2,1
+  function hnum(v) {
+    if (v == null) return NaN;
+    const s = String(v).trim();
+    if (s.charAt(0) === '+') { const n = num(s.slice(1)); return Number.isFinite(n) ? -n : NaN; }
+    return num(s);
+  }
+  function int(v) { const n = num(v); return Number.isInteger(n) ? n : NaN; }
+
+  function strokesFor(hj, si) {
+    if (hj >= 0) return Math.floor(hj / 18) + (si <= hj % 18 ? 1 : 0);
+    const k = -hj, r = k % 18;
+    return -(Math.floor(k / 18) + (r > 0 && si > 18 - r ? 1 : 0));
+  }
+  function esrFor(I, d) { const g = Math.round((I - d) * 10); return g >= 100 ? 2 : g >= 70 ? 1 : 0; }
+  function whs(list) {
+    const n = Math.min(list.length, 20);
+    if (!n) return null;
+    const [k, adj] = TABLE[n];
+    const best = list.slice(0, n).map((v, i) => [v, i]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).slice(0, k);
+    const used = {};
+    let sum = 0;
+    best.forEach(([v, i]) => { used[i] = true; sum += v; });
+    return { value: r1(r1(sum / k) + adj), k, n, adj, used };
+  }
+
+  function compute(st) {
+    const I = hnum(st.index), Sl = num(st.slope), R = num(st.sss);
+    let pcc = int(st.pcc);
+    if (!Number.isFinite(pcc)) pcc = 0;
+    const c = { I, Sl, R, pcc };
+    c.okI = Number.isFinite(I) && I >= -10 && I <= 54;
+    c.okS = Number.isFinite(Sl) && Sl >= 55 && Sl <= 155;
+    c.okR = Number.isFinite(R) && R >= 40 && R <= 90;
+
+    const pars = st.holes.map(h => int(h.par));
+    c.parOk = pars.map(p => p >= 3 && p <= 6);
+    c.allPar = c.parOk.every(Boolean);
+    c.parTotal = c.allPar ? pars.reduce((a, b) => a + b, 0) : NaN;
+
+    const hcps = st.holes.map(h => int(h.hcp));
+    const counts = {};
+    hcps.forEach(h => { if (h >= 1 && h <= 18) counts[h] = (counts[h] || 0) + 1; });
+    c.hcpState = hcps.map(h => !Number.isFinite(h) ? 'empty' : (h < 1 || h > 18) ? 'bad' : counts[h] > 1 ? 'dup' : 'ok');
+    c.hcpOk = c.hcpState.every(s => s === 'ok');
+    c.hcpBad = c.hcpState.includes('bad');
+    c.hcpMissing = []; c.hcpDup = [];
+    for (let k = 1; k <= 18; k++) { if (!counts[k]) c.hcpMissing.push(k); else if (counts[k] > 1) c.hcpDup.push(k); }
+
+    c.hjExact = NaN; c.hj = NaN;
+    if (c.okI && c.okS && c.okR && c.allPar) { c.hjExact = I * Sl / 113 + (R - c.parTotal); c.hj = rint(c.hjExact); }
+    c.strokesKnown = Number.isFinite(c.hj) && c.hcpOk;
+
+    c.holes = st.holes.map((h, i) => {
+      const par = pars[i], sc = int(h.score);
+      const o = { par: c.parOk[i] ? par : NaN, sc: NaN, cr: NaN, pts: NaN, ags: NaN, sbrut: NaN };
+      if (sc >= 1 && sc <= 20) o.sc = sc;
+      if (c.strokesKnown) o.cr = strokesFor(c.hj, hcps[i]);
+      if (Number.isFinite(o.sc) && c.parOk[i]) {
+        o.sbrut = Math.max(0, par + 2 - o.sc);
+        if (c.strokesKnown) {
+          o.pts = Math.max(0, par + o.cr + 2 - o.sc);   // Stableford net
+          o.ags = Math.min(o.sc, par + o.cr + 2);      // plafond : double bogey net
+        }
+      }
+      return o;
+    });
+    const tally = key => c.holes.reduce((acc, h) => Number.isFinite(h[key]) ? [acc[0] + h[key], acc[1] + 1] : acc, [0, 0]);
+    const g = tally('sc'), p = tally('pts'), b = tally('sbrut'), a = tally('ags');
+    c.gross = g[0]; c.nSc = g[1]; c.pts = p[0]; c.nPts = p[1]; c.sbrut = b[0]; c.nSbrut = b[1];
+    c.complete = c.nSc === 18 && c.strokesKnown;
+
+    c.ags = NaN; c.diffRaw = NaN; c.diff = NaN;
+    if (c.complete) {
+      c.ags = a[0];
+      c.diffRaw = 113 / Sl * (c.ags - R - pcc);
+      c.diff = r1(c.diffRaw);
+    }
+
+    // Repères : brut ajusté = par + handicap de jeu + 36 − points Stableford
+    c.targets = null;
+    if (c.okI && Number.isFinite(c.hj)) {
+      const t = { under: null, e1: null, e2: null };
+      for (let P = 0; P <= 100; P++) {
+        const d = r1(113 / Sl * (c.parTotal + c.hj + 36 - P - R - pcc));
+        const gap = Math.round((I - d) * 10);
+        if (t.under === null && gap > 0) t.under = P;
+        if (t.e1 === null && gap >= 70) t.e1 = P;
+        if (t.e2 === null && gap >= 100) t.e2 = P;
+      }
+      c.targets = t;
+    }
+    return c;
+  }
+
+  function project(c, histRaw, lowRaw) {
+    const hist = histRaw.map(hnum).filter(Number.isFinite);
+    const L = hnum(lowRaw);
+    const res = { hist, before: whs(hist), mode: hist.length ? 'precise' : 'quick', value: NaN, esr: 0, out: [], cap: '', L };
+    if (!c.complete || !c.okI) return res;
+    const I = c.I, d = c.diff, esr = esrFor(I, d);
+    res.esr = esr;
+    if (!hist.length) {
+      // Sans historique : le nouveau différentiel remplace un des 8 retenus, supposé égal à l’index (estimation prudente)
+      const v = d < I ? r1(I - (I - d) / 8) : I;
+      res.value = Math.min(54, r1(v - esr));
+      return res;
+    }
+    const list = [d].concat(hist).slice(0, 20);
+    const after = whs(list);
+    let val = r1(after.value - esr);
+    if (list.length >= 20 && Number.isFinite(L)) {
+      if (val > L + 3) { val = r1(L + 3 + (val - L - 3) / 2); res.cap = 'soft'; }
+      if (val > L + 5) { val = r1(L + 5); res.cap = 'hard'; }
+    }
+    res.value = Math.min(54, val);
+    res.after = after;
+    res.list = list;
+    res.out = hist.length >= 20 ? hist.slice(19) : [];
+    return res;
+  }
+  /* LOGIC-END */
+
+  /* ---------- Formatage ---------- */
+  const NB = '\u00a0';
+  const nf1 = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const nf2 = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const mn = s => String(s).replace(/-/g, '\u2212');
+  const f1 = x => mn(nf1.format(x));
+  const f2 = x => mn(nf2.format(x));
+  const fn = x => Number.isInteger(x) ? mn(x) : f1(x);
+  const fr = s => s.replace(/ ([:;?!])/g, NB + '$1');
+  const plural = (n, w) => n + NB + w + (Math.abs(n) > 1 ? 's' : '');
+  const listFr = a => a.length < 2 ? String(a[0]) : a.slice(0, -1).join(', ') + ' et ' + a[a.length - 1];
+  const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+  /* ---------- Mémoire JSON : format, chargement, sauvegarde ---------- */
+  const KEY = 'carte-score-memoire-json-v1';
+  const q = s => '«' + NB + s + NB + '»';
+  const dateFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  const fDate = iso => { const d = new Date(iso + 'T12:00:00'); return isNaN(d.getTime()) ? iso : dateFmt.format(d); };
+  const todayIso = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const isoDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  const numOrNull = v => { const n = num(v); return Number.isFinite(n) ? n : null; };
+  const hnumOrNull = v => { const n = hnum(v); return Number.isFinite(n) ? n : null; };
+  const intOrNull = v => { const n = int(v); return Number.isFinite(n) ? n : null; };
+  // Valeur JSON -> texte de saisie (virgule décimale)
+  const toStr = v => v == null ? '' : typeof v === 'number' ? (Number.isFinite(v) ? String(v).replace('.', ',') : '') : String(v).trim();
+  const toIdx = v => { const n = hnum(toStr(v)); return Number.isFinite(n) ? n.toFixed(1).replace('.', ',') : ''; };
+
+  function blank() {
+    return {
+      index: '', slope: '', sss: '', pcc: '0', low: '', courseName: '', courseId: '',
+      holes: Array.from({ length: 18 }, () => ({ par: '4', hcp: '', score: '' })),
+      hist: Array.from({ length: 20 }, () => ''),
+      courses: [], rounds: []
+    };
+  }
+
+  // Fichier JSON : clés en français, valeurs numériques
+  function toMemory(s) {
+    return {
+      application: 'Carte de score Stableford',
+      format: 1,
+      enregistreLe: new Date().toISOString(),
+      joueur: {
+        index: hnumOrNull(s.index),
+        indexLePlusBas12Mois: hnumOrNull(s.low),
+        differentiels: s.hist.map(hnumOrNull).filter(v => v !== null)
+      },
+      carteEnCours: {
+        parcours: s.courseName || null,
+        parcoursId: s.courseId || null,
+        slope: numOrNull(s.slope),
+        sss: numOrNull(s.sss),
+        pcc: intOrNull(s.pcc) || 0,
+        trous: s.holes.map((h, i) => ({ trou: i + 1, par: intOrNull(h.par), hcp: intOrNull(h.hcp), score: intOrNull(h.score) }))
+      },
+      parcours: s.courses.map(p => ({
+        id: p.id, nom: p.nom, slope: p.slope, sss: p.sss,
+        trous: p.trous.map((t, i) => ({ trou: i + 1, par: t.par, hcp: t.hcp }))
+      })),
+      parties: s.rounds.map(r => Object.assign({}, r))
+    };
+  }
+
+  function cleanCourse(p) {
+    if (!p || typeof p !== 'object' || typeof p.nom !== 'string' || !p.nom.trim() || !Array.isArray(p.trous) || p.trous.length !== 18) return null;
+    return {
+      id: typeof p.id === 'string' && p.id ? p.id.slice(0, 40) : uid(),
+      nom: p.nom.trim().slice(0, 80),
+      slope: numOrNull(p.slope),
+      sss: numOrNull(p.sss),
+      trous: p.trous.map(t => ({ par: intOrNull(t && t.par), hcp: intOrNull(t && t.hcp) }))
+    };
+  }
+  function cleanRound(r) {
+    const date = r && typeof r === 'object' ? isoDate(r.date) : null;
+    if (!date) return null;
+    return {
+      id: typeof r.id === 'string' && r.id ? r.id.slice(0, 40) : uid(),
+      date,
+      parcours: typeof r.parcours === 'string' ? r.parcours.slice(0, 80) : '',
+      slope: numOrNull(r.slope), sss: numOrNull(r.sss), par: intOrNull(r.par), pcc: intOrNull(r.pcc) || 0,
+      index: hnumOrNull(r.index), handicapDeJeu: intOrNull(r.handicapDeJeu),
+      scores: Array.isArray(r.scores) ? r.scores.slice(0, 18).map(intOrNull) : [],
+      brut: intOrNull(r.brut), brutAjuste: intOrNull(r.brutAjuste), points: intOrNull(r.points),
+      differentiel: hnumOrNull(r.differentiel), nouvelIndex: hnumOrNull(r.nouvelIndex),
+      reductionExceptionnelle: intOrNull(r.reductionExceptionnelle) || 0,
+      calcul: r.calcul === 'exact' ? 'exact' : 'estimation'
+    };
+  }
+  const sortRounds = list => list.sort((a, b) => b.date.localeCompare(a.date) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
+
+  function fromMemory(o) {
+    if (!o || typeof o !== 'object' || Array.isArray(o) || !['joueur', 'carteEnCours', 'parcours', 'parties'].some(k => k in o)) throw new Error('format');
+    const b = blank();
+    const j = o.joueur && typeof o.joueur === 'object' ? o.joueur : {};
+    b.index = toIdx(j.index);
+    b.low = toIdx(j.indexLePlusBas12Mois);
+    (Array.isArray(j.differentiels) ? j.differentiels : []).map(toIdx).filter(Boolean).slice(0, 20).forEach((v, i) => { b.hist[i] = v; });
+    const c = o.carteEnCours && typeof o.carteEnCours === 'object' ? o.carteEnCours : {};
+    b.courseName = typeof c.parcours === 'string' ? c.parcours.slice(0, 80) : '';
+    b.courseId = typeof c.parcoursId === 'string' ? c.parcoursId : '';
+    b.slope = toStr(c.slope);
+    b.sss = toStr(c.sss);
+    const pcc = String(c.pcc == null ? 0 : c.pcc);
+    b.pcc = ['-1', '0', '1', '2', '3'].includes(pcc) ? pcc : '0';
+    if (Array.isArray(c.trous) && c.trous.length === 18) {
+      b.holes = c.trous.map(t => ({ par: toStr(t && t.par) || '4', hcp: toStr(t && t.hcp), score: toStr(t && t.score) }));
+    }
+    b.courses = (Array.isArray(o.parcours) ? o.parcours : []).map(cleanCourse).filter(Boolean).sort((x, y) => x.nom.localeCompare(y.nom, 'fr'));
+    b.rounds = sortRounds((Array.isArray(o.parties) ? o.parties : []).map(cleanRound).filter(Boolean));
+    return b;
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      return raw ? fromMemory(JSON.parse(raw)) : null;
+    } catch (e) { return null; }
+  }
+  let st = load() || blank();
+  let saveTimer;
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try { localStorage.setItem(KEY, JSON.stringify(toMemory(st))); } catch (e) { /* stockage indisponible : le fichier JSON exporté reste la sauvegarde */ }
+    }, 250);
+  }
+  const snapshot = () => JSON.parse(JSON.stringify(st));
+
+  /* ---------- Construction de la grille ---------- */
+  const $ = id => document.getElementById(id);
+  const tbody = $('rows');
+  const rows = [], subs = [];
+  const frag = document.createDocumentFragment();
+  function subRow(label, cls) {
+    const tr = document.createElement('tr');
+    tr.className = cls;
+    tr.innerHTML = '<th scope="row">' + label + '</th><td class="s-par"></td><td></td><td class="s-cr"></td><td class="s-sc"></td><td class="s-pts"></td>';
+    subs.push({ par: tr.querySelector('.s-par'), cr: tr.querySelector('.s-cr'), sc: tr.querySelector('.s-sc'), pts: tr.querySelector('.s-pts') });
+    return tr;
+  }
+  for (let i = 0; i < 18; i++) {
+    const n = i + 1;
+    const tr = document.createElement('tr');
+    tr.dataset.i = i;
+    tr.innerHTML =
+      '<th scope="row">' + n + '</th>' +
+      '<td><input class="cell-in in-par" data-f="par" inputmode="numeric" autocomplete="off" maxlength="1" aria-label="Par du trou ' + n + '"></td>' +
+      '<td><input class="cell-in in-hcp" data-f="hcp" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="\u2013" aria-label="Handicap du trou ' + n + '"></td>' +
+      '<td class="cr"></td>' +
+      '<td><div class="stepper">' +
+        '<button type="button" data-d="-1" aria-label="Un coup de moins au trou ' + n + '">\u2212</button>' +
+        '<input class="in-score" data-f="score" inputmode="numeric" autocomplete="off" maxlength="2" placeholder="\u2013" aria-label="Score du trou ' + n + '">' +
+        '<button type="button" data-d="1" aria-label="Un coup de plus au trou ' + n + '">+</button>' +
+      '</div></td>' +
+      '<td><span class="pts" data-k=""></span></td>';
+    frag.appendChild(tr);
+    rows.push({ par: tr.querySelector('.in-par'), hcp: tr.querySelector('.in-hcp'), score: tr.querySelector('.in-score'), cr: tr.querySelector('.cr'), pts: tr.querySelector('.pts') });
+    if (n === 9) frag.appendChild(subRow('Aller', 'sub'));
+    if (n === 18) frag.appendChild(subRow('Retour', 'sub'));
+  }
+  frag.appendChild(subRow('Total', 'sub total'));
+  tbody.appendChild(frag);
+
+  const hgrid = $('hgrid'), hInputs = [];
+  for (let j = 0; j < 20; j++) {
+    const lab = document.createElement('label');
+    lab.innerHTML = '<span aria-hidden="true">' + (j + 1) + '</span><input inputmode="decimal" autocomplete="off" maxlength="6" aria-label="Différentiel n°' + NB + (j + 1) + (j === 0 ? ', le plus récent' : j === 19 ? ', le plus ancien' : '') + '">';
+    const inp = lab.querySelector('input');
+    inp.dataset.j = j;
+    hgrid.appendChild(lab);
+    hInputs.push(inp);
+  }
+
+  const fIndex = $('f-index'), fSlope = $('f-slope'), fSss = $('f-sss'), fPcc = $('f-pcc'), fLow = $('f-low');
+  function fillInputs() {
+    fIndex.value = st.index; fSlope.value = st.slope; fSss.value = st.sss; fPcc.value = st.pcc; fLow.value = st.low;
+    rows.forEach((r, i) => { r.par.value = st.holes[i].par; r.hcp.value = st.holes[i].hcp; r.score.value = st.holes[i].score; });
+    hInputs.forEach((inp, j) => { inp.value = st.hist[j]; });
+  }
+
+  /* ---------- Rendu ---------- */
+  const el = {
+    hjNum: $('hj-num'), hjMain: $('hj-main'), hjF: $('hj-f'), warn: $('warn'),
+    resNum: $('res-num'), resUnit: $('res-unit'), resSub: $('res-sub'),
+    sBrut: $('s-brut'), sNet: $('s-net'), sSbrut: $('s-sbrut'), sAgs: $('s-ags'),
+    ixCur: $('ix-cur'), ixNew: $('ix-new'), ixNewK: $('ix-new-k'), ixDelta: $('ix-delta'),
+    ixDiff: $('ix-diff'), ixDiffF: $('ix-diff-f'), ixMsg: $('ix-msg'), ixEsr: $('ix-esr'),
+    mkP: $('mk-p'), mk: { under: $('mk-under'), e1: $('mk-e1'), e2: $('mk-e2') },
+    hCount: $('h-count'), hOut: $('h-out'),
+    live: $('live'), lvPts: $('lv-pts'), lvB: $('lv-b'), lvC: $('lv-c')
+  };
+
+  function crHtml(n) {
+    if (!Number.isFinite(n) || n === 0) return '';
+    if (n > 0) return '<span aria-hidden="true">' + (n <= 5 ? '/'.repeat(n) : n + '/') + '</span><span class="sr">' + plural(n, 'coup') + ' reçu' + (n > 1 ? 's' : '') + '</span>';
+    return '<span aria-hidden="true" class="give">' + mn(n) + '</span><span class="sr">' + plural(-n, 'coup') + ' rendu' + (n < -1 ? 's' : '') + '</span>';
+  }
+  function describe(w) {
+    const adj = w.adj ? ', ' + f1(w.adj) : '';
+    if (w.k === 1) return (w.n === 1 ? 'votre seul différentiel' : 'le meilleur de vos ' + w.n + ' différentiels') + adj;
+    return 'moyenne des ' + w.k + ' meilleurs ' + (w.n === 20 ? 'de vos 20 derniers différentiels' : 'sur ' + w.n) + adj;
+  }
+  function message(c, pr) {
+    const I = c.I, d = c.diff;
+    if (pr.mode === 'quick') {
+      const tail = ' Pour le chiffre exact, ajoutez vos derniers différentiels ci\u2011dessous.';
+      if (pr.esr) return 'Votre différentiel (' + f1(d) + ') est ' + f1(r1(I - d)) + ' points sous votre index (' + f1(I) + ') : il compte parmi vos 8 meilleurs scores et déclenche une réduction exceptionnelle.' + tail;
+      if (d < I && pr.value < I) return 'Votre différentiel (' + f1(d) + ') est sous votre index (' + f1(I) + ') : ce score entre dans vos 8 meilleurs et fait baisser votre index. Estimation prudente, car tout dépend aussi du score qui sort de vos 20 derniers.' + tail;
+      if (d < I) return 'Votre différentiel (' + f1(d) + ') est à peine sous votre index (' + f1(I) + ') : l’effet sur l’index sera très faible.' + tail;
+      return 'Votre différentiel (' + f1(d) + ') est au-dessus de votre index (' + f1(I) + ') : ce score ne devrait pas compter parmi vos 8 meilleurs, l’index reste stable. Il peut remonter un peu si le score qui sort de vos 20 derniers faisait partie des 8 retenus.';
+    }
+    const a = pr.after, inUsed = !!a.used[0];
+    let s = a.k > 1
+      ? 'Ce score ' + (inUsed ? 'fait partie' : 'ne fait pas partie') + ' des ' + a.k + ' meilleurs différentiels retenus'
+      : (inUsed ? 'Ce score devient votre meilleur différentiel' : 'Ce score n’est pas votre meilleur différentiel');
+    if (pr.out.length) s += ', et le plus ancien (' + f1(pr.out[0]) + ') sort de l’historique' + (pr.before && pr.before.used[19] ? ' alors qu’il comptait' : '');
+    s += '.';
+    if (pr.cap === 'soft') s += ' Hausse freinée par le plafonnement progressif (index le plus bas sur 12 mois : ' + f1(pr.L) + ').';
+    if (pr.cap === 'hard') s += ' Hausse limitée à +5 au-dessus de votre index le plus bas sur 12 mois (' + f1(pr.L) + ').';
+    return s;
+  }
+
+  function renderHist(c, pr) {
+    const h = pr.hist;
+    el.hCount.textContent = h.length ? plural(h.length, 'différentiel') + ' saisi' + (h.length > 1 ? 's' : '') : 'Facultatif';
+    hInputs.forEach((inp, j) => inp.classList.toggle('bad', st.hist[j].trim() !== '' && !Number.isFinite(hnum(st.hist[j]))));
+    if (!h.length) { el.hOut.innerHTML = ''; return; }
+    const b = pr.before;
+    let html = '<p>' + esc(fr('Votre historique donne aujourd’hui un index de ')) + '<b>' + f1(b.value) + '</b> (' + esc(describe(b)) + ').';
+    if (c.okI && Math.abs(r1(b.value - c.I)) >= 0.2) html += ' ' + esc(fr('Écart avec votre index saisi (' + f1(c.I) + ') : un ajustement fédéral (score exceptionnel, plafonnement) ou une erreur de saisie peut l’expliquer.'));
+    html += '</p>';
+    if (c.complete && pr.after) {
+      html += '<div class="chips">';
+      pr.list.forEach((v, i) => { html += '<span class="chip' + (pr.after.used[i] ? ' used' : '') + (i === 0 ? ' new' : '') + '">' + f1(v) + '</span>'; });
+      pr.out.forEach(v => { html += '<span class="chip out">' + f1(v) + '</span>'; });
+      html += '</div><p class="chips-key">' + esc(fr('Fond blanc : différentiels retenus. Cerclé de jaune : cette partie.' + (pr.out.length ? ' Barré : le plus ancien, qui sort.' : ''))) + '</p>';
+      html += '<p>' + esc(fr('Nouvel index : ')) + '<b>' + f1(pr.value) + '</b>' + esc(', ' + describe(pr.after) + (pr.esr ? ', moins ' + f1(pr.esr) + ' de réduction exceptionnelle' : '') + (pr.cap ? ', plafonné' : '') + '.') + '</p>';
+    } else {
+      html += '<p>' + esc('Complétez la carte pour voir le nouvel index calculé avec cet historique.') + '</p>';
+    }
+    el.hOut.innerHTML = html;
+  }
+
+  function update() {
+    const c = compute(st);
+    const pr = project(c, st.hist, st.low);
+
+    fIndex.classList.toggle('bad', st.index.trim() !== '' && !c.okI);
+    fSlope.classList.toggle('bad', st.slope.trim() !== '' && !c.okS);
+    fSss.classList.toggle('bad', st.sss.trim() !== '' && !c.okR);
+    fLow.classList.toggle('bad', st.low.trim() !== '' && !Number.isFinite(hnum(st.low)));
+
+    // Handicap de jeu
+    if (Number.isFinite(c.hj)) {
+      el.hjNum.textContent = String(Math.abs(c.hj));
+      el.hjMain.textContent = c.hj >= 0 ? (c.hj > 1 ? 'coups reçus' : 'coup reçu') : (c.hj < -1 ? 'coups rendus' : 'coup rendu');
+      el.hjF.textContent = 'Handicap de jeu = ' + f1(c.I) + ' × ' + fn(c.Sl) + ' / 113 + (' + fn(c.R) + ' − ' + c.parTotal + ') = ' + f2(c.hjExact) + ', arrondi à ' + mn(c.hj) + '.';
+    } else {
+      el.hjNum.textContent = '–';
+      el.hjMain.textContent = 'Handicap de jeu';
+      const miss = [];
+      if (!c.okI) miss.push(st.index.trim() ? 'un index valide (54 au plus)' : 'votre index');
+      if (!c.okS) miss.push(st.slope.trim() ? 'un slope entre 55 et 155' : 'le slope');
+      if (!c.okR) miss.push(st.sss.trim() ? 'un SSS valide' : 'le SSS');
+      el.hjF.textContent = miss.length ? 'Renseignez ' + listFr(miss) + '.' : 'Vérifiez le par de chaque trou.';
+    }
+
+    // Alertes sur la carte
+    const w = [];
+    if (c.hcpMissing.length === 18 && !c.hcpBad) w.push('Renseignez le handicap de chaque trou (de 1 à 18), indiqué sur la carte du parcours.');
+    else {
+      if (c.hcpMissing.length) w.push((c.hcpMissing.length > 1 ? 'Il manque les handicaps ' : 'Il manque le handicap ') + listFr(c.hcpMissing) + '.');
+      if (c.hcpDup.length) w.push((c.hcpDup.length > 1 ? 'Les handicaps ' + listFr(c.hcpDup) + ' sont saisis' : 'Le handicap ' + c.hcpDup[0] + ' est saisi') + ' plusieurs fois.');
+      if (c.hcpBad) w.push('Un handicap de trou va de 1 à 18.');
+    }
+    if (!c.allPar) w.push('Le par de chaque trou doit être compris entre 3 et 6.');
+    el.warn.textContent = w.join(' ');
+    el.warn.hidden = !w.length;
+
+    // Lignes
+    c.holes.forEach((h, i) => {
+      const r = rows[i];
+      r.par.classList.toggle('bad', !c.parOk[i]);
+      r.hcp.classList.toggle('bad', c.hcpState[i] === 'bad' || c.hcpState[i] === 'dup');
+      const crh = crHtml(h.cr);
+      if (r.cr.innerHTML !== crh) r.cr.innerHTML = crh;
+      const has = Number.isFinite(h.pts);
+      r.pts.setAttribute('data-k', has ? String(Math.min(h.pts, 4)) : '');
+      r.pts.textContent = has ? String(h.pts) : '';
+    });
+
+    // Sous-totaux : aller, retour, total
+    [[0, 9], [9, 18], [0, 18]].forEach(([a, b], k) => {
+      const hs = c.holes.slice(a, b), s = subs[k];
+      const sum = key => hs.reduce((t, h) => t + (Number.isFinite(h[key]) ? h[key] : 0), 0);
+      const cnt = key => hs.filter(h => Number.isFinite(h[key])).length;
+      s.par.textContent = cnt('par') === hs.length ? sum('par') : '';
+      s.cr.textContent = c.strokesKnown ? mn(sum('cr')) : '';
+      s.sc.textContent = cnt('sc') ? sum('sc') : '';
+      s.pts.textContent = cnt('pts') ? sum('pts') : '';
+    });
+
+    // Résultat
+    if (c.nPts > 0) {
+      el.resNum.textContent = c.pts;
+      el.resUnit.textContent = (c.pts > 1 ? 'points' : 'point') + ' en Stableford net';
+      if (c.complete) {
+        const dl = c.pts - 36;
+        el.resSub.textContent = fr(dl === 0
+          ? 'Pile 36 : vous avez joué votre handicap de jeu.'
+          : (dl < 0 ? plural(-dl, 'point') + ' de moins' : plural(dl, 'point') + ' de plus') + ' que les 36 qui correspondent à votre handicap de jeu.');
+      } else {
+        el.resSub.textContent = 'Après ' + plural(c.nPts, 'trou') + ' sur 18.';
+      }
+    } else {
+      el.resNum.textContent = '–';
+      el.resUnit.textContent = 'points en Stableford net';
+      el.resSub.textContent = c.strokesKnown ? 'Saisissez vos scores trou par trou.' : 'Complétez l’index, le slope, le SSS et les handicaps des trous.';
+    }
+    el.sBrut.textContent = c.nSc ? c.gross : '–';
+    el.sNet.textContent = c.complete ? mn(c.gross - c.hj) : '–';
+    el.sSbrut.textContent = c.nSbrut ? c.sbrut : '–';
+    el.sAgs.textContent = c.complete ? c.ags : '–';
+
+    // Index
+    el.ixCur.textContent = c.okI ? f1(c.I) : '–';
+    if (c.complete && c.okI) {
+      el.ixDiff.textContent = f1(c.diff);
+      const pccTxt = c.pcc ? ' − ' + (c.pcc < 0 ? '(' + mn(c.pcc) + ')' : c.pcc) : '';
+      el.ixDiffF.textContent = '113 / ' + fn(c.Sl) + ' × (' + c.ags + ' − ' + fn(c.R) + pccTxt + ') = ' + f2(c.diffRaw);
+      const v = pr.value, dlt = r1(v - c.I);
+      el.ixNew.textContent = f1(v);
+      el.ixNewK.textContent = pr.mode === 'precise' ? 'Nouvel index' : 'Nouvel index estimé';
+      if (dlt < 0) { el.ixDelta.textContent = '\u2212' + nf1.format(-dlt) + (pr.mode === 'quick' ? ' ou plus' : ''); el.ixDelta.className = 'd down'; }
+      else if (dlt > 0) { el.ixDelta.textContent = '+' + nf1.format(dlt); el.ixDelta.className = 'd up'; }
+      else { el.ixDelta.textContent = 'stable'; el.ixDelta.className = 'd'; }
+      el.ixMsg.textContent = fr(message(c, pr));
+      el.ixEsr.hidden = !pr.esr;
+      if (pr.esr) el.ixEsr.textContent = fr('Score exceptionnel : votre différentiel est ' + f1(r1(c.I - c.diff)) + ' points sous votre index. Réduction supplémentaire de ' + f1(pr.esr) + ' sur l’index.');
+    } else {
+      el.ixDiff.textContent = '–';
+      el.ixDiffF.textContent = '';
+      el.ixNew.textContent = '–';
+      el.ixNewK.textContent = 'Nouvel index';
+      el.ixDelta.textContent = '';
+      el.ixDelta.className = 'd';
+      el.ixMsg.textContent = c.strokesKnown && c.okI
+        ? 'Complétez les 18 trous pour calculer le différentiel et l’effet sur votre index.'
+        : 'Complétez la carte pour calculer le différentiel et l’effet sur votre index.';
+      el.ixEsr.hidden = true;
+    }
+
+    // Repères
+    const T = c.targets;
+    Object.keys(el.mk).forEach(key => {
+      const li = el.mk[key], b = li.querySelector('b'), val = T ? T[key] : null;
+      b.textContent = val != null ? val + NB + 'pts et +' : '–';
+      li.classList.toggle('hit', !!(c.complete && val != null && c.pts >= val));
+    });
+    el.mkP.textContent = T
+      ? 'Points Stableford nets à atteindre sur cette carte' + (c.pcc ? ', avec un PCC de ' + (c.pcc > 0 ? '+' : '') + mn(c.pcc) : '') + '.'
+      : 'Renseignez l’index, le slope et le SSS pour voir les repères.';
+
+    renderHist(c, pr);
+
+    // Barre en direct
+    if (c.nPts > 0) {
+      el.live.hidden = false;
+      el.lvPts.textContent = c.pts;
+      if (c.complete && c.okI) {
+        el.lvB.innerHTML = 'Diff.' + NB + '<b>' + f1(c.diff) + '</b>';
+        el.lvC.innerHTML = 'Index' + NB + (pr.mode === 'quick' ? '≈' + NB : '') + '<b>' + f1(pr.value) + '</b>';
+        el.lvC.hidden = false;
+      } else {
+        el.lvB.innerHTML = '<b>' + c.nPts + '</b>/18' + NB + 'trous';
+        el.lvC.hidden = true;
+      }
+    } else {
+      el.live.hidden = true;
+    }
+
+    // Enregistrement de la partie dans la mémoire
+    const canSave = c.complete && c.okI;
+    mem.roundSave.disabled = !canSave;
+    mem.saveHint.textContent = !canSave
+      ? 'Complétez les 18 trous pour enregistrer la partie dans la mémoire.'
+      : pr.mode === 'precise'
+        ? 'Ajoute la partie à la mémoire et son différentiel à votre historique, met l’index à jour, puis vide la carte.'
+        : 'Ajoute la partie à la mémoire, puis vide la carte. Sans historique de différentiels, l’index saisi ne change pas.';
+  }
+
+  /* ---------- Mémoire : affichage et actions ---------- */
+  const mem = {
+    pickWrap: $('pick-wrap'), pick: $('course-pick'),
+    roundDate: $('round-date'), roundSave: $('round-save'), saveHint: $('save-hint'),
+    sparkWrap: $('spark-wrap'), spark: $('spark'), sparkCap: $('spark-cap'),
+    rounds: $('rounds-list'), roundsEmpty: $('rounds-empty'), roundsHint: $('rounds-hint'),
+    courses: $('courses-list'), coursesEmpty: $('courses-empty'), courseName: $('course-name'),
+    jsonBox: $('json-box'), jsonText: $('json-text'), file: $('json-file'),
+    toast: $('toast'), toastMsg: $('toast-msg'), toastUndo: $('toast-undo')
+  };
+
+  let toastTimer = null, undoSnap = null;
+  function toast(msg, snap) {
+    mem.toastMsg.textContent = fr(msg);
+    undoSnap = snap || null;
+    mem.toastUndo.hidden = !undoSnap;
+    mem.toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { mem.toast.hidden = true; undoSnap = null; }, undoSnap ? 9000 : 4500);
+  }
+  function refreshAll() { fillInputs(); renderMemory(); update(); save(); }
+  const memoryText = () => JSON.stringify(toMemory(st), null, 2);
+
+  function renderSpark() {
+    // Index au départ de chaque partie enregistrée, puis index après la dernière
+    const rs = st.rounds.slice().reverse().filter(r => Number.isFinite(r.index) && Number.isFinite(r.nouvelIndex));
+    if (!rs.length) { mem.sparkWrap.hidden = true; return; }
+    const last = rs[rs.length - 1];
+    const vals = rs.map(r => r.index).concat(last.nouvelIndex);
+    const W = 320, H = 80, px = 8, py = 10;
+    const min = Math.min.apply(null, vals), max = Math.max.apply(null, vals), span = Math.max(max - min, 0.5);
+    const X = i => px + i * (W - 2 * px) / (vals.length - 1);
+    const Y = v => py + (max - v) / span * (H - 2 * py);
+    let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true"><polyline class="sp-line" points="' +
+      vals.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ') + '"/>';
+    vals.forEach((v, i) => {
+      const end = i === vals.length - 1;
+      svg += '<circle class="' + (end ? 'sp-last' : 'sp-pt') + '" cx="' + X(i).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="' + (end ? 4.5 : 3) + '"/>';
+    });
+    mem.spark.innerHTML = svg + '</svg>';
+    mem.sparkCap.textContent = fr('De ' + f1(vals[0]) + ' le ' + fDate(rs[0].date) + ' à ' + (last.calcul === 'exact' ? '' : '≈' + NB) + f1(last.nouvelIndex) +
+      ' après la partie du ' + fDate(last.date) + '. Index le plus bas atteint : ' + f1(min) + '.');
+    mem.sparkWrap.hidden = false;
+  }
+
+  function renderMemory() {
+    mem.pick.innerHTML = '<option value="">Choisir un parcours enregistré</option>' +
+      st.courses.map(p => '<option value="' + esc(p.id) + '">' + esc(p.nom) + '</option>').join('');
+    mem.pick.value = st.courses.some(p => p.id === st.courseId) ? st.courseId : '';
+    mem.pickWrap.hidden = !st.courses.length;
+
+    mem.courses.innerHTML = st.courses.map(p => {
+      const parOk = p.trous.every(t => Number.isFinite(t.par));
+      const meta = (Number.isFinite(p.slope) ? '<span>Slope <b>' + fn(p.slope) + '</b></span>' : '') +
+        (Number.isFinite(p.sss) ? '<span>SSS <b>' + fn(p.sss) + '</b></span>' : '') +
+        (parOk ? '<span>Par <b>' + p.trous.reduce((t, h) => t + h.par, 0) + '</b></span>' : '');
+      return '<li><div class="info"><span class="name">' + esc(p.nom) + '</span><span class="meta">' + meta + '</span></div>' +
+        '<button type="button" class="mini" data-load="' + esc(p.id) + '">Charger</button>' +
+        '<button type="button" class="del" data-delc="' + esc(p.id) + '" aria-label="' + esc('Supprimer le parcours ' + p.nom) + '">×</button></li>';
+    }).join('');
+    mem.coursesEmpty.hidden = st.courses.length > 0;
+    if (document.activeElement !== mem.courseName) mem.courseName.value = st.courseName;
+
+    mem.rounds.innerHTML = st.rounds.map(r => {
+      let meta = '';
+      if (Number.isFinite(r.points)) meta += '<span><b>' + r.points + '</b>' + NB + 'pts</span>';
+      if (Number.isFinite(r.brut)) meta += '<span>Brut <b>' + r.brut + '</b></span>';
+      if (Number.isFinite(r.differentiel)) meta += '<span>Diff. <b>' + f1(r.differentiel) + '</b></span>';
+      if (Number.isFinite(r.index) && Number.isFinite(r.nouvelIndex)) {
+        meta += '<span>Index <b>' + f1(r.index) + '</b> → ' + (r.calcul === 'exact' ? '' : '≈' + NB) + '<b>' + f1(r.nouvelIndex) + '</b></span>';
+      }
+      if (r.reductionExceptionnelle) meta += '<span>Score exceptionnel, ' + mn(-r.reductionExceptionnelle) + '</span>';
+      return '<li><div class="info"><span class="name">' + esc(fDate(r.date)) + (r.parcours ? ' <span class="where">' + esc(r.parcours) + '</span>' : '') + '</span>' +
+        '<span class="meta">' + meta + '</span></div>' +
+        '<button type="button" class="del" data-delr="' + esc(r.id) + '" aria-label="' + esc('Supprimer la partie du ' + fDate(r.date)) + '">×</button></li>';
+    }).join('');
+    mem.roundsEmpty.hidden = st.rounds.length > 0;
+    mem.roundsHint.hidden = !st.rounds.length;
+    renderSpark();
+    if (mem.jsonBox.open && document.activeElement !== mem.jsonText) mem.jsonText.value = memoryText();
+  }
+
+  function saveCourse() {
+    const name = mem.courseName.value.trim().slice(0, 80);
+    const c = compute(st);
+    if (!name) { toast('Donnez un nom au parcours, par exemple avec la couleur des repères.'); mem.courseName.focus(); return; }
+    if (!c.okS || !c.okR || !c.allPar || !c.hcpOk) { toast('Complétez le slope, le SSS, le par et le handicap des 18 trous avant d’enregistrer le parcours.'); return; }
+    const snap = snapshot();
+    const data = { nom: name, slope: c.Sl, sss: c.R, trous: st.holes.map(h => ({ par: int(h.par), hcp: int(h.hcp) })) };
+    let p = st.courses.find(x => x.nom.toLowerCase() === name.toLowerCase());
+    const existed = !!p;
+    if (p) Object.assign(p, data); else { p = Object.assign({ id: uid() }, data); st.courses.push(p); }
+    st.courses.sort((x, y) => x.nom.localeCompare(y.nom, 'fr'));
+    st.courseName = name;
+    st.courseId = p.id;
+    renderMemory(); save();
+    toast('Parcours ' + q(name) + (existed ? ' mis à jour.' : ' enregistré.'), snap);
+  }
+  function loadCourse(id) {
+    const p = st.courses.find(x => x.id === id);
+    if (!p) return;
+    const snap = snapshot();
+    st.slope = toStr(p.slope);
+    st.sss = toStr(p.sss);
+    st.holes.forEach((h, i) => { h.par = toStr(p.trous[i].par) || '4'; h.hcp = toStr(p.trous[i].hcp); });
+    st.courseName = p.nom;
+    st.courseId = p.id;
+    refreshAll();
+    toast('Parcours ' + q(p.nom) + ' chargé.', snap);
+  }
+  function deleteCourse(id) {
+    const p = st.courses.find(x => x.id === id);
+    if (!p) return;
+    const snap = snapshot();
+    st.courses = st.courses.filter(x => x.id !== id);
+    if (st.courseId === id) st.courseId = '';
+    renderMemory(); save();
+    toast('Parcours ' + q(p.nom) + ' supprimé.', snap);
+  }
+
+  function saveRound() {
+    const c = compute(st);
+    if (!c.complete || !c.okI) return;
+    const pr = project(c, st.hist, st.low);
+    const snap = snapshot();
+    st.rounds.push({
+      id: uid(),
+      date: isoDate(mem.roundDate.value) || todayIso(),
+      parcours: st.courseName.trim(),
+      slope: c.Sl, sss: c.R, par: c.parTotal, pcc: c.pcc,
+      index: c.I, handicapDeJeu: c.hj,
+      scores: c.holes.map(h => h.sc),
+      brut: c.gross, brutAjuste: c.ags, points: c.pts,
+      differentiel: c.diff, nouvelIndex: pr.value,
+      reductionExceptionnelle: pr.esr,
+      calcul: pr.mode === 'precise' ? 'exact' : 'estimation'
+    });
+    sortRounds(st.rounds);
+    let msg;
+    if (pr.mode === 'precise') {
+      // Le différentiel entre en tête de l’historique ; une réduction exceptionnelle s’applique à toute la liste, comme dans le WHS
+      let list = [c.diff].concat(st.hist.map(hnum).filter(Number.isFinite)).slice(0, 20);
+      if (pr.esr) list = list.map(v => r1(v - pr.esr));
+      st.hist = Array.from({ length: 20 }, (_, i) => i < list.length ? toIdx(list[i]) : '');
+      st.index = toIdx(pr.value);
+      const L = hnum(st.low);
+      if (Number.isFinite(L) && pr.value < L) st.low = toIdx(pr.value);
+      msg = 'Partie enregistrée. Différentiel ' + f1(c.diff) + ' ajouté à votre historique, index mis à jour : ' + f1(pr.value) + '.';
+    } else {
+      msg = 'Partie enregistrée. Votre index reste ' + f1(c.I) + ' : ajoutez vos derniers différentiels pour qu’il se mette à jour à chaque partie.';
+    }
+    st.holes.forEach(h => { h.score = ''; });
+    st.pcc = '0';
+    mem.roundDate.value = todayIso();
+    refreshAll();
+    toast(msg, snap);
+  }
+  function deleteRound(id) {
+    const r = st.rounds.find(x => x.id === id);
+    if (!r) return;
+    const snap = snapshot();
+    st.rounds = st.rounds.filter(x => x.id !== id);
+    renderMemory(); save();
+    toast('Partie du ' + fDate(r.date) + ' supprimée de la mémoire.', snap);
+  }
+
+  function exportJson() {
+    const name = 'carte-score-memoire-' + todayIso() + '.json';
+    try {
+      const url = URL.createObjectURL(new Blob([memoryText()], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast('Fichier ' + name + ' exporté.');
+    } catch (e) {
+      mem.jsonBox.open = true;
+      toast('L’export n’a pas pu démarrer : copiez le JSON ci\u2011dessous.');
+    }
+  }
+  function applyMemory(obj, msg) {
+    const next = fromMemory(obj);
+    const snap = snapshot();
+    st = next;
+    mem.roundDate.value = todayIso();
+    refreshAll();
+    toast(msg, snap);
+  }
+
+  mem.pick.addEventListener('change', () => { if (mem.pick.value) loadCourse(mem.pick.value); });
+  mem.courseName.addEventListener('input', () => { st.courseName = mem.courseName.value.slice(0, 80); save(); });
+  mem.courseName.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveCourse(); } });
+  $('course-save').addEventListener('click', saveCourse);
+  mem.courses.addEventListener('click', e => {
+    const l = e.target.closest('[data-load]');
+    if (l) { loadCourse(l.dataset.load); return; }
+    const d = e.target.closest('[data-delc]');
+    if (d) deleteCourse(d.dataset.delc);
+  });
+  mem.rounds.addEventListener('click', e => {
+    const d = e.target.closest('[data-delr]');
+    if (d) deleteRound(d.dataset.delr);
+  });
+  mem.roundSave.addEventListener('click', saveRound);
+  mem.toastUndo.addEventListener('click', () => {
+    if (!undoSnap) return;
+    st = undoSnap;
+    refreshAll();
+    toast('Action annulée.');
+  });
+
+  $('json-export').addEventListener('click', exportJson);
+  $('json-import').addEventListener('click', () => mem.file.click());
+  mem.file.addEventListener('change', () => {
+    const f = mem.file.files && mem.file.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try { applyMemory(JSON.parse(String(reader.result)), 'Mémoire importée depuis ' + f.name + '.'); }
+      catch (e) { toast('Ce fichier n’est pas une mémoire de la carte de score (JSON attendu).'); }
+      mem.file.value = '';
+    };
+    reader.onerror = () => { toast('Lecture du fichier impossible.'); mem.file.value = ''; };
+    reader.readAsText(f);
+  });
+  mem.jsonBox.addEventListener('toggle', () => { if (mem.jsonBox.open) mem.jsonText.value = memoryText(); });
+  $('json-copy').addEventListener('click', () => {
+    const txt = memoryText();
+    mem.jsonText.value = txt;
+    const done = () => toast('JSON copié dans le presse-papiers.');
+    const fallback = () => {
+      mem.jsonText.focus();
+      mem.jsonText.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      if (ok) done(); else toast('Sélectionnez le texte et copiez-le à la main.');
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fallback);
+    else fallback();
+  });
+  $('json-load').addEventListener('click', () => {
+    try { applyMemory(JSON.parse(mem.jsonText.value), 'Mémoire chargée depuis le JSON collé.'); }
+    catch (e) { toast('Ce texte n’est pas une mémoire de la carte de score (JSON attendu).'); }
+  });
+
+  /* ---------- Interactions ---------- */
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const smooth = () => reduce ? 'auto' : 'smooth';
+  function bump(i) {
+    if (reduce) return;
+    const p = rows[i].pts;
+    p.classList.remove('pop');
+    void p.offsetWidth;
+    p.classList.add('pop');
+  }
+  const decimalOnly = v => v.replace(/[^0-9,.\-+\u2212]/g, '').slice(0, 6);
+
+  tbody.addEventListener('input', e => {
+    const t = e.target, f = t.dataset.f;
+    if (!f) return;
+    const i = +t.closest('tr').dataset.i;
+    const v = t.value.replace(/\D/g, '').slice(0, f === 'par' ? 1 : 2);
+    if (v !== t.value) t.value = v;
+    st.holes[i][f] = v;
+    update(); save();
+    if (f === 'score') bump(i);
+  });
+  tbody.addEventListener('click', e => {
+    const b = e.target.closest('button[data-d]');
+    if (!b) return;
+    const i = +b.closest('tr').dataset.i, d = +b.dataset.d, h = st.holes[i];
+    let par = int(h.par), sc = int(h.score);
+    if (!Number.isFinite(par)) par = 4;
+    if (!Number.isFinite(sc)) sc = d > 0 ? par : par - 1;   // premier appui : le par, ou un de moins
+    else sc = Math.max(1, Math.min(20, sc + d));
+    h.score = String(sc);
+    rows[i].score.value = h.score;
+    update(); save(); bump(i);
+  });
+  tbody.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const t = e.target, f = t.dataset && t.dataset.f;
+    if (!f) return;
+    e.preventDefault();
+    const next = rows[+t.closest('tr').dataset.i + 1];
+    if (next) next[f].focus(); else t.blur();
+  });
+
+  [['index', fIndex, decimalOnly], ['slope', fSlope, v => v.replace(/\D/g, '').slice(0, 3)], ['sss', fSss, decimalOnly], ['low', fLow, decimalOnly]].forEach(([k, inp, clean]) => {
+    inp.addEventListener('input', () => {
+      const v = clean(inp.value);
+      if (v !== inp.value) inp.value = v;
+      st[k] = v;
+      update(); save();
+    });
+  });
+  [fIndex, fSlope].forEach((inp, k) => inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); [fSlope, fSss][k].focus(); }
+  }));
+  fPcc.addEventListener('change', () => { st.pcc = fPcc.value; update(); save(); });
+
+  hgrid.addEventListener('input', e => {
+    const t = e.target;
+    if (t.dataset.j == null) return;
+    const v = decimalOnly(t.value);
+    if (v !== t.value) t.value = v;
+    st.hist[+t.dataset.j] = v;
+    update(); save();
+  });
+  hgrid.addEventListener('paste', e => {
+    const t = e.target;
+    if (t.dataset.j == null) return;
+    const text = (e.clipboardData || window.clipboardData).getData('text') || '';
+    const tokens = text.split(/[\s;|]+/).map(s => s.replace(/^,+|,+$/g, '')).filter(s => s && Number.isFinite(hnum(s)));
+    if (tokens.length < 2) return;
+    e.preventDefault();
+    const start = +t.dataset.j;
+    tokens.forEach((tok, k) => {
+      const j = start + k;
+      if (j < 20) { st.hist[j] = tok.slice(0, 6); hInputs[j].value = st.hist[j]; }
+    });
+    update(); save();
+  });
+  $('h-clear').addEventListener('click', () => {
+    const snap = snapshot();
+    st.hist = Array.from({ length: 20 }, () => '');
+    st.low = '';
+    refreshAll();
+    toast('Historique de différentiels effacé.', snap);
+  });
+
+  $('b-new').addEventListener('click', () => {
+    st.holes.forEach(h => { h.score = ''; });
+    st.pcc = '0';
+    fillInputs(); update(); save();
+    document.querySelector('.grid').scrollIntoView({ behavior: smooth(), block: 'start' });
+  });
+  const bReset = $('b-reset');
+  let armed = null;
+  function disarm() { clearTimeout(armed); armed = null; bReset.textContent = 'Tout effacer'; bReset.classList.remove('confirm'); }
+  bReset.addEventListener('click', () => {
+    if (!armed) {
+      bReset.textContent = 'Confirmer\u00a0: tout effacer';
+      bReset.classList.add('confirm');
+      armed = setTimeout(disarm, 4000);
+      return;
+    }
+    disarm();
+    const snap = snapshot();
+    st = blank();
+    mem.roundDate.value = todayIso();
+    refreshAll();
+    window.scrollTo({ top: 0, behavior: smooth() });
+    toast('Tout est effacé, mémoire comprise.', snap);
+  });
+
+  el.live.addEventListener('click', () => $('result').scrollIntoView({ behavior: smooth(), block: 'start' }));
+
+  // Pendant la saisie, la barre du bas s’efface pour ne pas gêner le clavier
+  document.addEventListener('focusin', e => {
+    const t = e.target;
+    if (!t.matches) return;
+    if (t.matches('input, select, textarea')) document.body.classList.add('typing');
+    if (t.matches('.cell-in, .in-score, .field input, .hgrid input, #f-low')) setTimeout(() => { try { t.select(); } catch (err) { /* rien */ } }, 0);
+  });
+  document.addEventListener('focusout', () => {
+    setTimeout(() => {
+      const a = document.activeElement;
+      if (!a || !a.matches || !a.matches('input, select, textarea')) document.body.classList.remove('typing');
+    }, 60);
+  });
+
+  mem.roundDate.value = todayIso();
+  fillInputs();
+  renderMemory();
+  update();
+})();
+</script>
+</body>
+</html>
